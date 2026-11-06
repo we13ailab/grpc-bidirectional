@@ -1,12 +1,20 @@
 package com.javatechie.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "stocks")
 public class Stock {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -14,25 +22,36 @@ public class Stock {
     @Column(name = "stock_symbol", unique = true, nullable = false)
     private String stockSymbol;
 
+    @Column(nullable = false)
     private double price;
 
-    @Column(name = "last_updated")
+    @Column(name = "last_updated", nullable = false)
     private LocalDateTime lastUpdated;
+
+    protected Stock() {
+        // required by JPA
+    }
+
+    public Stock(String stockSymbol, double price) {
+        this.stockSymbol = stockSymbol;
+        this.price = price;
+    }
+
+    /**
+     * Keeps {@code last_updated} fresh without relying on callers to set it.
+     */
+    @PrePersist
+    @PreUpdate
+    void touch() {
+        this.lastUpdated = LocalDateTime.now();
+    }
 
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public String getStockSymbol() {
         return stockSymbol;
-    }
-
-    public void setStockSymbol(String stockSymbol) {
-        this.stockSymbol = stockSymbol;
     }
 
     public double getPrice() {
@@ -47,7 +66,8 @@ public class Stock {
         return lastUpdated;
     }
 
-    public void setLastUpdated(LocalDateTime lastUpdated) {
-        this.lastUpdated = lastUpdated;
+    @Override
+    public String toString() {
+        return "Stock{symbol='%s', price=%.2f, lastUpdated=%s}".formatted(stockSymbol, price, lastUpdated);
     }
 }

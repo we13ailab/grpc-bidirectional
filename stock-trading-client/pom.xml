@@ -5,30 +5,32 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.4</version>
+		<version>3.5.16</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.javatechie</groupId>
 	<artifactId>stock-trading-client</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>stock-trading-client</name>
-	<description>Demo project for Spring Boot</description>
+	<description>gRPC client demo exercising all four RPC communication patterns</description>
 
 	<properties>
 		<java.version>21</java.version>
-		<grpc.version>1.70.0</grpc.version>
-		<protobuf-java.version>3.25.6</protobuf-java.version>
-		<spring-grpc.version>0.5.0</spring-grpc.version>
+		<!-- Keep in sync with the io.grpc version managed by spring-grpc-dependencies -->
+		<grpc.version>1.76.0</grpc.version>
+		<!-- protoc and protobuf-java must stay on the same version -->
+		<protobuf-java.version>3.25.8</protobuf-java.version>
+		<spring-grpc.version>0.12.0</spring-grpc.version>
 	</properties>
 	<dependencies>
 		<dependency>
-			<groupId>io.grpc</groupId>
-			<artifactId>grpc-services</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter</artifactId>
 		</dependency>
+		<!-- official Spring gRPC client support -->
 		<dependency>
-			<groupId>net.devh</groupId>
-			<artifactId>grpc-client-spring-boot-starter</artifactId>
-			<version>2.15.0.RELEASE</version>
+			<groupId>org.springframework.grpc</groupId>
+			<artifactId>spring-grpc-client-spring-boot-starter</artifactId>
 		</dependency>
 
 		<dependency>
@@ -57,17 +59,13 @@
 			<artifactId>grpc-stub</artifactId>
 			<version>${grpc.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>io.grpc</groupId>
-			<artifactId>grpc-census</artifactId>
-			<version>${grpc.version}</version>
-		</dependency>
 		<!-- Protobuf Java -->
 		<dependency>
 			<groupId>com.google.protobuf</groupId>
 			<artifactId>protobuf-java</artifactId>
 			<version>${protobuf-java.version}</version>
 		</dependency>
+
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>
