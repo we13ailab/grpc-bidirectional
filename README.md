@@ -205,3 +205,161 @@ This is a demo, so a few shortcuts were taken deliberately:
 - Plaintext transport — configure TLS (`spring.grpc.client.channels.<name>.ssl.*`, `spring.grpc.server.ssl.*`) for anything beyond localhost.
 - Prices in `subscribeStockPrice` are simulated around the stored base price; `liveTrading` validates but does not persist trades.
 - No auth — Spring gRPC supports interceptor-based security (e.g. `@GlobalClientInterceptor` / `BasicAuthenticationInterceptor`).
+
+## Testing in Postman
+
+## Option 1: Create the gRPC requests in Postman (recommended)
+
+1. Click **New → gRPC**.
+2. Enter the server URL `localhost:9090`.
+3. Under **Service definition**, choose **Server reflection**. Your collection notes say reflection is enabled. Otherwise, choose **Import a .proto file** and upload `stock_trading.proto`.
+4. Pick the method from the dropdown. Postman detects the type (unary, server streaming, etc.) from the proto.
+5. Paste the message into the **Message** tab, then click **Invoke**. For streaming methods, use **Send** for each message and **End streaming** when done.
+6. Save each request into a collection. You can share it through a Postman workspace or fork instead of exporting JSON.
+
+Messages to use:
+
+| Method | Messages |
+|---|---|
+| `getStockPrice` | `{"stock_symbol": "AAPL"}` |
+| `subscribeStockPrice` | `{"stock_symbol": "AAPL"}` |
+| `bulkStockOrder` | `{"order_id":"ORD-101","stock_symbol":"AAPL","quantity":10,"price":227.50,"order_type":"BUY"}`, then `{"order_id":"ORD-102","stock_symbol":"GOOGL","quantity":5,"price":172.50,"order_type":"SELL"}`, then `{"order_id":"ORD-103","stock_symbol":"AMZN","quantity":8,"price":199.00,"order_type":"BUY"}` |
+| `liveTrading` | `{"order_id":"LIVE-201","stock_symbol":"MSFT","quantity":4,"price":415.00,"order_type":"BUY"}`, then `{"order_id":"LIVE-202","stock_symbol":"NVDA","quantity":0,"price":145.00,"order_type":"SELL"}` |
+
+## Option 2: Script it with grpcurl
+
+If you want something you can commit and re-run, `grpcurl` works with your reflection-enabled server:
+
+```bash
+# Unary
+grpcurl -plaintext -d '{"stock_symbol":"AAPL"}' localhost:9090 \
+  stocktrading.StockTradingService/getStockPrice
+
+# Server streaming
+grpcurl -plaintext -d '{"stock_symbol":"AAPL"}' localhost:9090 \
+  stocktrading.StockTradingService/subscribeStockPrice
+
+# Client streaming (multiple JSON objects on stdin)
+grpcurl -plaintext -d @ localhost:9090 \
+  stocktrading.StockTradingService/bulkStockOrder <<'EOF'
+{"order_id":"ORD-101","stock_symbol":"AAPL","quantity":10,"price":227.50,"order_type":"BUY"}
+{"order_id":"ORD-102","stock_symbol":"GOOGL","quantity":5,"price":172.50,"order_type":"SELL"}
+{"order_id":"ORD-103","stock_symbol":"AMZN","quantity":8,"price":199.00,"order_type":"BUY"}
+EOF
+
+# Bidirectional streaming
+grpcurl -plaintext -d @ localhost:9090 \
+  stocktrading.StockTradingService/liveTrading <<'EOF'
+{"order_id":"LIVE-201","stock_symbol":"MSFT","quantity":4,"price":415.00,"order_type":"BUY"}
+{"order_id":"LIVE-202","stock_symbol":"NVDA","quantity":0,"price":145.00,"order_type":"SELL"}
+EOF
+```
+
+Your original notes still apply: `getStockPrice` needs the symbols seeded in the `stocks` table, and the invalid-quantity order should come back as `FAILED`.
+
+## Above grpCurl Commands and their output
+
+```
+➜  grpc-bidirectional # Unary
+➜  grpc-bidirectional grpcurl -plaintext -d '{"stock_symbol":"AAPL"}' localhost:9090 \
+>   stocktrading.StockTradingService/getStockPrice
+{
+  "stock_symbol": "AAPL",
+  "price": 227.5,
+  "timestamp": "2026-11-05T17:22:54"
+}
+
+
+➜  grpc-bidirectional # Server streaming
+➜  grpc-bidirectional grpcurl -plaintext -d '{"stock_symbol":"AAPL"}' localhost:9090 \
+>   stocktrading.StockTradingService/subscribeStockPrice
+{
+  "stock_symbol": "AAPL",
+  "price": 230.5,
+  "timestamp": "2026-11-06T07:10:10.367062055Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 230.85,
+  "timestamp": "2026-11-06T07:10:11.367770965Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 227.15,
+  "timestamp": "2026-11-06T07:10:12.368437210Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 225.34,
+  "timestamp": "2026-11-06T07:10:13.369066718Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 226.11,
+  "timestamp": "2026-11-06T07:10:14.369725762Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 226.57,
+  "timestamp": "2026-11-06T07:10:15.370418684Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 226.88,
+  "timestamp": "2026-11-06T07:10:16.371088092Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 223.27,
+  "timestamp": "2026-11-06T07:10:17.371716808Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 223.69,
+  "timestamp": "2026-11-06T07:10:18.372446883Z"
+}
+{
+  "stock_symbol": "AAPL",
+  "price": 226.1,
+  "timestamp": "2026-11-06T07:10:19.373069699Z"
+}
+
+
+
+➜  grpc-bidirectional # Client streaming (multiple JSON objects on stdin)
+➜  grpc-bidirectional grpcurl -plaintext -d @ localhost:9090 \
+>   stocktrading.StockTradingService/bulkStockOrder <<'EOF'
+heredoc> {"order_id":"ORD-101","stock_symbol":"AAPL","quantity":10,"price":227.50,"order_type":"BUY"}
+heredoc> {"order_id":"ORD-102","stock_symbol":"GOOGL","quantity":5,"price":172.50,"order_type":"SELL"}
+heredoc> {"order_id":"ORD-103","stock_symbol":"AMZN","quantity":8,"price":199.00,"order_type":"BUY"}
+heredoc> EOF
+{
+  "total_orders": 3,
+  "total_amount": 4729.5,
+  "success_count": 3
+}
+
+
+
+➜  grpc-bidirectional # Bidirectional streaming
+➜  grpc-bidirectional grpcurl -plaintext -d @ localhost:9090 \
+>   stocktrading.StockTradingService/liveTrading <<'EOF'
+heredoc> {"order_id":"LIVE-201","stock_symbol":"MSFT","quantity":4,"price":415.00,"order_type":"BUY"}
+heredoc> {"order_id":"LIVE-202","stock_symbol":"NVDA","quantity":0,"price":145.00,"order_type":"SELL"}
+heredoc> EOF
+{
+  "order_id": "LIVE-201",
+  "status": "EXECUTED",
+  "message": "BUY 4 x MSFT @ $415.00 processed successfully",
+  "timestamp": "2026-11-06T07:10:20.674860121Z"
+}
+{
+  "order_id": "LIVE-202",
+  "status": "FAILED",
+  "message": "Invalid quantity: 0",
+  "timestamp": "2026-11-06T07:10:20.677226653Z"
+}
+
+
+
+```

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>📈 Live Stock Prices</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script> <!-- FontAwesome for icons -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Chart.js for graphs -->
+
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: 'Arial', sans-serif;
+        }
+        .container {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .stock-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+        .stock-card {
+            width: 160px;
+            height: 160px;
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            text-align: center;
+            padding: 15px;
+            box-shadow: 0px 4px 10px rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .stock-card:hover {
+            transform: scale(1.05);
+        }
+        .stock-symbol {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .stock-price {
+            font-size: 22px;
+            font-weight: bold;
+        }
+        .price-up { color: #00c853; }
+        .price-down { color: #d50000; }
+        .timestamp {
+            font-size: 12px;
+            color: #bdbdbd;
+        }
+    </style>
+
+    <script>
+        let stockPrices = {};
+        let priceHistory = {};
+        let chart;
+        let activeChartSymbol = null;
+        const eventSources = {};
+
+        function subscribeStock(symbol) {
+            symbol = symbol.trim().toUpperCase();
+            if (!symbol || eventSources[symbol]) return;
+
+            const eventSource = new EventSource(`/stocks/subscribe/${encodeURIComponent(symbol)}`);
+            eventSources[symbol] = eventSource;
+
+            const stockContainer = document.getElementById("stockContainer");
+            let card = document.getElementById(`stock-${symbol}`);
+            if (!card) {
+                card = document.createElement("div");
+                card.className = "stock-card";
+                card.id = `stock-${symbol}`;
+                card.addEventListener("click", () => showGraph(symbol));
+
+                const symbolElement = document.createElement("div");
+                symbolElement.className = "stock-symbol";
+                symbolElement.textContent = symbol;
+                const priceElement = document.createElement("div");
+                priceElement.className = "stock-price";
+                priceElement.id = `price-${symbol}`;
+                priceElement.textContent = "Loading...";
+                const timeElement = document.createElement("div");
+                timeElement.className = "timestamp";
+                timeElement.id = `time-${symbol}`;
+                timeElement.textContent = "--";
+                card.append(symbolElement, priceElement, timeElement);
+                stockContainer.appendChild(card);
+            }
+
+            priceHistory[symbol] = priceHistory[symbol] || [];
+
+            eventSource.onmessage = function(event) {
+                const stockData = JSON.parse(event.data);
+                const priceElement = document.getElementById(`price-${symbol}`);
+                const timeElement = document.getElementById(`time-${symbol}`);
+                if (!priceElement || !timeElement || !Number.isFinite(stockData.price)) return;
+
+                const previousPrice = stockPrices[symbol];
+                priceElement.className = "stock-price";
+                if (previousPrice !== undefined) {
+                    priceElement.classList.add(stockData.price >= previousPrice ? "price-up" : "price-down");
+                }
+
+                priceElement.textContent = Number(stockData.price).toFixed(2);
+                timeElement.textContent = stockData.timestamp || "--";
+
+                stockPrices[symbol] = stockData.price;
+
+                priceHistory[symbol].push({ time: stockData.timestamp, price: stockData.price });
+                if (chart && activeChartSymbol === symbol) {
+                    updateChart(symbol);
+                }
+            };
+
+            eventSource.onerror = function() {
+                console.error(`Error receiving stock data for ${symbol}`);
+                eventSource.close();
+                delete eventSources[symbol];
+                document.getElementById(`time-${symbol}`).textContent = "Stream ended";
+            };
+        }
+
+        function showGraph(symbol) {
+            document.getElementById("chartModal").style.display = "block";
+            document.getElementById("chartTitle").innerText = symbol;
+            activeChartSymbol = symbol;
+            drawChart(symbol);
+        }
+
+        function drawChart(symbol) {
+            const ctx = document.getElementById("stockChart").getContext("2d");
+
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: priceHistory[symbol].map(data => data.time),
+                    datasets: [{
+                        label: `Price of ${symbol}`,
+                        data: priceHistory[symbol].map(data => data.price),
+                        borderColor: "#00c853",
+                        backgroundColor: "rgba(0, 200, 83, 0.2)",
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Time" } },
+                        y: { title: { display: true, text: "Price" } }
+                    }
+                }
+            });
+        }
+
+        function updateChart(symbol) {
+            if (!chart) return;
+            chart.data.labels = priceHistory[symbol].map(data => data.time);
+            chart.data.datasets[0].data = priceHistory[symbol].map(data => data.price);
+            chart.update();
+        }
+
+        function closeModal() {
+            document.getElementById("chartModal").style.display = "none";
+            activeChartSymbol = null;
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("subscribeForm").addEventListener("submit", event => {
+                event.preventDefault();
+                const input = document.getElementById("stockSymbol");
+                subscribeStock(input.value);
+                input.value = "";
+            });
+        });
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <h2>📈 Real-Time Stock Prices</h2>
+    <form id="subscribeForm" class="d-flex justify-content-center">
+        <input type="text" id="stockSymbol" class="form-control w-25 me-2" placeholder="Enter Stock Symbol" aria-label="Stock symbol">
+        <button type="submit" class="btn btn-success">
+            <i class="fas fa-bell"></i> Subscribe
+        </button>
+    </form>
+
+    <div class="stock-container mt-4" id="stockContainer"></div>
+</div>
+
+<!-- Modal for Stock Chart -->
+<div id="chartModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8);">
+    <div class="modal-content" style="background: white; color: black; padding: 20px; width: 60%; margin: 10% auto; border-radius: 10px; text-align: center;">
+        <h3 id="chartTitle"></h3>
+        <canvas id="stockChart" style="max-height: 300px;"></canvas>
+        <br>
+        <button class="btn btn-danger" onclick="closeModal()">Close</button>
+    </div>
+</div>
+
+</body>
+</html>
