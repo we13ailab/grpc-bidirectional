@@ -1,5 +1,17 @@
-grpc:
-  client:
-    stockService:
-      address: "static://localhost:9090"
-      negotiationType: PLAINTEXT
+spring:
+  application:
+    name: stock-trading-client
+
+  grpc:
+    client:
+      channels:
+        stockService:
+          # Override with GRPC_SERVER_ADDRESS, e.g. static://some-host:9090
+          address: ${GRPC_SERVER_ADDRESS:static://localhost:9090}
+          negotiation-type: plaintext
+
+client:
+  demo:
+    # Runs one round of each RPC pattern on startup; disable with
+    # --client.demo.enabled=false to just boot the client.
+    enabled: true

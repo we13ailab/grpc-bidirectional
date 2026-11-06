@@ -1,0 +1,25 @@
+# Local MySQL instance used by stock-trading-server.
+# Start:  docker compose up -d
+# Stop:   docker compose down          (add -v to also drop the data volume)
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: stock-trading-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-javatechie}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # $$ escapes to $ inside the container, where MYSQL_ROOT_PASSWORD is set
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

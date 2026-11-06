@@ -1,4 +1,24 @@
-grpc:
-  server:
-    port: 9090
-    enable-reflection: true
+# All configuration in one place. Values can be overridden with environment
+# variables, e.g. MYSQL_PASSWORD=secret GRPC_SERVER_PORT=9091 java -jar ...
+spring:
+  application:
+    name: stock-trading-server
+
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:javatechie}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:Password}
+
+  jpa:
+    hibernate:
+      # Auto-creates/updates the "stocks" table. Use real migrations (Flyway/Liquibase) in production.
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+
+  grpc:
+    server:
+      port: ${GRPC_SERVER_PORT:9090}
+      # Lets grpcurl discover services without passing .proto files
+      reflection:
+        enabled: true
